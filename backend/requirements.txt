@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+numpy
+torch
+
+# detectron2 is optional and platform-specific. To install detectron2, follow the official instructions:
+# https://detectron2.readthedocs.io/en/latest/tutorials/install.html
+# Example (CPU-only wheel may not be provided):
+# pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu118/torch2.2/index.html
+
+# If you don't need detectron2, the backend will still run and return a stubbed response.

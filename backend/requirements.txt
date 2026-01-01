@@ -3,7 +3,7 @@ FROM python:3.9-slim-bullseye
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Install EVERYTHING needed to build AI software from scratch
+# 1. Install system tools, compiler, AND git
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     libgl1 \
@@ -16,18 +16,24 @@ RUN apt-get update -y && \
 
 WORKDIR /app
 
-# 2. Install Torch (CPU version)
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# 2. Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
 
-# 3. Install Detectron2 directly from GitHub (The most reliable way)
-# This avoids broken links and builds it specifically for your server
+# 3. Install Torch (This part worked in your logs!)
+RUN pip install --no-cache-dir \
+    torch==2.1.0 \
+    torchvision==0.16.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# 4. BUILD DETECTRON2 FROM SOURCE
+# This is the most reliable way to avoid "Version Not Found" errors
 RUN pip install --no-cache-dir 'git+https://github.com/facebookresearch/detectron2.git'
 
-# 4. Standard requirements
+# 5. Install the rest of your requirements
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Finish setup
+# 6. Copy code and start
 COPY . /app
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,50 +1,64 @@
+import os
 import io
 import base64
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
+import gc
 import cv2
 import numpy as np
 import torch
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2 import model_zoo
-import torch
-import gc
 
-# 1. Disable Gradient Calculation (saves ~30% memory)
+# --- 1. EMERGENCY FIXES FOR DEPLOYMENT ---
+# Forces PyTorch 2.6 to load "untrusted" Detectron2 weights
+os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+
+# Disable Gradient Calculation (saves ~30% RAM)
 torch.set_grad_enabled(False)
-
-# 2. Force CPU-only mode (prevents CUDA initialization overhead)
-device = torch.device("cpu")
-
-# 3. Add this after your model finishes a prediction
-def clean_memory():
-    gc.collect()
-    torch.cuda.empty_cache() # Even on CPU, this helps clear PyTorch's internal allocator
 
 app = FastAPI()
 
-# --- CORS SETUP: Allow React Frontend ---
+# --- 2. CORS SETUP ---
+# Added both localhost and your new Railway URL to allow communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Vite's default port
+    allow_origins=[
+        "http://localhost:5173", 
+        "https://car-damage-detection-production.up.railway.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- AI MODEL INITIALIZATION ---
+# --- 3. AI MODEL INITIALIZATION ---
 cfg = get_cfg()
 cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2 
-cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.10 # Your Precision Requirement
-cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.0     # Your Smoothing Requirement
-# Example using a direct download URL
-cfg.MODEL.WEIGHTS = "https://your-storage-link.com/damage_segmentation_model.pth"
-cfg.MODEL.DEVICE = "cpu" # Change to "cuda" if using GPU
+
+# PREFERENCE: Precision 0.10 and Smoothness 0
+cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.10 
+cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.0     
+
+# FIXED: Look for the file locally in the same folder as this script
+base_path = os.path.dirname(__file__)
+model_weights_path = os.path.join(base_path, "damage_segmentation_model.pth")
+cfg.MODEL.WEIGHTS = model_weights_path
+
+cfg.MODEL.DEVICE = "cpu"  # Required for Railway Free Tier
+
+# Initialize Predictor
 predictor = DefaultPredictor(cfg)
-client = Groq(api_key="YOUR_GROQ_API_KEY")
+
+# Groq Client (API Key should be in Railway Variables)
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "model_loaded": os.path.exists(model_weights_path)}
 
 @app.post("/scan")
 async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), model: str = Form(...)):
@@ -69,6 +83,9 @@ async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), mode
         ]}]
     )
 
+    # Clean up memory after processing
+    gc.collect()
+
     return {
         "damage_found": damage_count,
         "bill_html": response.choices[0].message.content
@@ -76,4 +93,6 @@ async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), mode
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Railway provides the PORT environment variable automatically
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -24,12 +24,15 @@ function App() {
     formData.append("model", model);
 
     try {
-      // Points to your FastAPI backend (Step 2)
-      const response = await axios.post("car-damage-detection-production.up.railway.app", formData);
+      // ✅ UPDATED URL: Added https:// and /scan endpoint
+      const response = await axios.post(
+        "https://car-damage-detection-production.up.railway.app/scan", 
+        formData
+      );
       setResult(response.data);
     } catch (err) {
       console.error(err);
-      alert("Error connecting to AI Backend. Is it running?");
+      alert("Error connecting to AI Backend. Check browser console for details.");
     } finally {
       setLoading(false);
     }
@@ -65,6 +68,7 @@ function App() {
       {result && (
         <div style={{ marginTop: '30px', border: '1px solid #ddd', padding: '20px', borderRadius: '8px' }}>
           <h3>📋 Repair Estimate for {brand} {model}</h3>
+          <p><strong>Damage Spots Found:</strong> {result.damage_found}</p>
           <div dangerouslySetInnerHTML={{ __html: result.bill_html }} />
         </div>
       )}

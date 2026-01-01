@@ -25,7 +25,7 @@ function App() {
 
     try {
       // Points to your FastAPI backend (Step 2)
-      const response = await axios.post("http://localhost:8000/scan", formData);
+      const response = await axios.post("car-damage-detection-production.up.railway.app", formData);
       setResult(response.data);
     } catch (err) {
       console.error(err);

@@ -9,6 +9,19 @@ from groq import Groq
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2 import model_zoo
+import torch
+import gc
+
+# 1. Disable Gradient Calculation (saves ~30% memory)
+torch.set_grad_enabled(False)
+
+# 2. Force CPU-only mode (prevents CUDA initialization overhead)
+device = torch.device("cpu")
+
+# 3. Add this after your model finishes a prediction
+def clean_memory():
+    gc.collect()
+    torch.cuda.empty_cache() # Even on CPU, this helps clear PyTorch's internal allocator
 
 app = FastAPI()
 

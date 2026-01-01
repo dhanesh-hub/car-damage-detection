@@ -11,14 +11,14 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 2. Prepare Pip & Build Tools
+# 2. Upgrade Pip & Build Tools
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel ninja
 
-# 3. Install Torch (Keep this exactly as is)
+# 3. Install Torch (CPU version)
 RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 # 4. INSTALL DETECTRON2 (The Fix)
-# We add --no-build-isolation so it can "see" the torch we just installed
+# --no-build-isolation allows the build to see the 'torch' we just installed
 RUN pip install --no-cache-dir --no-build-isolation 'git+https://github.com/facebookresearch/detectron2.git'
 
 # 5. Remaining Requirements

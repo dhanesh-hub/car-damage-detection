@@ -1,36 +1,23 @@
-# 1. Use a standard Python image
-FROM python:3.9-slim
+# 1. We switch to 'bullseye' - it is much more stable for OpenCV
+FROM python:3.9-slim-bullseye
 
-# 2. Switch to root to ensure we have permissions for system installs
+# 2. Permissions and non-interactive settings
 USER root
-
-# 3. Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 4. Install system dependencies required for OpenCV
-# These are essential for the 'import cv2' command to work on Linux
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+# 3. Use the updated, stable package names for OpenCV
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# 5. Set the working directory inside the container
+# 4. Standard setup
 WORKDIR /app
-
-# 6. Copy requirements first (improves build speed using cache)
-# Since Render Root is 'backend', we just use './' or 'requirements.txt'
 COPY requirements.txt ./
-
-# 7. Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
-
-# 8. Copy the rest of your backend code
-# IMPORTANT: Use '.' because we are already inside the 'backend' folder
 COPY . /app
 
-# 9. Expose the port (Render usually uses 10000, but 8000 is fine)
+# 5. Start the server
 EXPOSE 8000
-
-# 10. Command to start the server
-# We use 0.0.0.0 so it is accessible from the internet
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

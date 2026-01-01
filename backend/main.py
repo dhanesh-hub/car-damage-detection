@@ -40,7 +40,8 @@ cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rc
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2 
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.10 # Your Precision Requirement
 cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.0     # Your Smoothing Requirement
-cfg.MODEL.WEIGHTS = "damage_segmentation_model.pth"
+# Example using a direct download URL
+cfg.MODEL.WEIGHTS = "https://your-storage-link.com/damage_segmentation_model.pth"
 cfg.MODEL.DEVICE = "cpu" # Change to "cuda" if using GPU
 predictor = DefaultPredictor(cfg)
 client = Groq(api_key="YOUR_GROQ_API_KEY")

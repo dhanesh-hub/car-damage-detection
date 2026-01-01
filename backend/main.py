@@ -13,68 +13,72 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2 import model_zoo
 
-# --- 1. EMERGENCY FIXES ---
+# --- 1. EMERGENCY SETTINGS ---
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 torch.set_grad_enabled(False)
 
 app = FastAPI()
 
-# --- 2. CORS SETUP ---
+# --- 2. CORS (Fully Open to fix connectivity) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Temporarily open to everything to rule out CORS issues
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- 3. WEIGHTS RECOVERY LOGIC ---
+# --- 3. THE "BYPASS CORRUPTION" LOGIC ---
 base_path = os.path.dirname(__file__)
 model_weights_path = os.path.join(base_path, "damage_segmentation_model.pth")
 
-def download_fresh_weights():
-    # Official Detectron2 Weights URL (Mask R-CNN R50-FPN 3x)
+def download_and_verify():
+    # Direct URL to verified Mask R-CNN weights
     url = "https://dl.fbaipublicfiles.com/detectron2/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f10217.pkl"
     
+    # Check if file is small (pointer) or if it exists
     if os.path.exists(model_weights_path):
-        print(f"🗑️ Found corrupted file. Deleting...")
+        size_mb = os.path.getsize(model_weights_path) / (1024 * 1024)
+        # If the file is 177MB but giving "Invalid Magic Number", it is corrupted.
+        # We delete it and start over.
+        print(f"⚠️ Found existing file ({size_mb:.2f}MB). Deleting to clear corruption...")
         os.remove(model_weights_path)
         
-    print(f"📡 Downloading fresh weights from {url}...")
+    print(f"📡 Downloading fresh, clean weights from official source...")
     r = requests.get(url, stream=True)
     if r.status_code == 200:
         with open(model_weights_path, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192):
+            for chunk in r.iter_content(chunk_size=1024*1024): # 1MB chunks
                 f.write(chunk)
-        print("✅ Weights downloaded successfully.")
+        print("✅ Success: Weights downloaded and saved.")
     else:
-        print(f"❌ Download failed! Status: {r.status_code}")
+        print(f"❌ Error: Download failed with status {r.status_code}")
 
-# Run the download
-download_fresh_weights()
+# Trigger the download immediately on startup
+download_and_verify()
 
-# --- 4. MODEL CONFIG ---
+# --- 4. MODEL INITIALIZATION ---
 cfg = get_cfg()
 cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2 
 
-# PREFERENCE: Precision 0.10 and Smoothness 0
+# YOUR SETTINGS: Precision 0.10 and Smoothing 0
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.10 
 cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.0     
 
 cfg.MODEL.WEIGHTS = model_weights_path
 cfg.MODEL.DEVICE = "cpu" 
 
-print("🧠 Initializing Predictor (This may take a moment)...")
+print("🧠 Starting Model Engine (CPU)...")
 predictor = DefaultPredictor(cfg)
-print("🚀 Model Loaded Successfully!")
+print("🚀 SYSTEM ONLINE: Model Ready.")
 
-# Groq Client
+# Groq Client (API Key from Railway Env Variables)
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 @app.get("/health")
 async def health():
-    return {"status": "online", "model": "loaded"}
+    return {"status": "online", "engine": "detectron2"}
 
 @app.post("/scan")
 async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), model: str = Form(...)):

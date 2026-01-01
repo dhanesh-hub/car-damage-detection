@@ -3,7 +3,7 @@ FROM python:3.9-slim-bullseye
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Install system tools, compiler, AND git
+# 1. Install system tools, compiler, git, and ninja
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     libgl1 \
@@ -12,6 +12,7 @@ RUN apt-get update -y && \
     g++ \
     python3-dev \
     git \
+    ninja-build \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,14 +20,14 @@ WORKDIR /app
 # 2. Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 
-# 3. Install Torch (This part worked in your logs!)
+# 3. Install Torch (This part worked in your previous logs!)
 RUN pip install --no-cache-dir \
     torch==2.1.0 \
     torchvision==0.16.0 \
     --index-url https://download.pytorch.org/whl/cpu
 
 # 4. BUILD DETECTRON2 FROM SOURCE
-# This is the most reliable way to avoid "Version Not Found" errors
+# We use the GitHub link directly to avoid broken wheel files
 RUN pip install --no-cache-dir 'git+https://github.com/facebookresearch/detectron2.git'
 
 # 5. Install the rest of your requirements

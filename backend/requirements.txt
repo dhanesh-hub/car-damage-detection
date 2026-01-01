@@ -3,7 +3,7 @@ FROM python:3.9-slim-bullseye
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Install system tools, compiler, git, and ninja
+# 1. Install system tools, compiler, and GIT (needed to download detectron2)
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     libgl1 \
@@ -12,7 +12,6 @@ RUN apt-get update -y && \
     g++ \
     python3-dev \
     git \
-    ninja-build \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -20,21 +19,21 @@ WORKDIR /app
 # 2. Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 
-# 3. Install Torch (This part worked in your previous logs!)
+# 3. Install Torch (This part worked! Keep it exactly like this)
 RUN pip install --no-cache-dir \
     torch==2.1.0 \
     torchvision==0.16.0 \
     --index-url https://download.pytorch.org/whl/cpu
 
-# 4. BUILD DETECTRON2 FROM SOURCE
-# We use the GitHub link directly to avoid broken wheel files
+# 4. INSTALL FROM SOURCE (The Fix)
+# We download and build it directly. This is much more reliable.
 RUN pip install --no-cache-dir 'git+https://github.com/facebookresearch/detectron2.git'
 
-# 5. Install the rest of your requirements
+# 5. Rest of your requirements
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 6. Copy code and start
+# 6. Copy code and launch
 COPY . /app
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

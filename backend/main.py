@@ -11,16 +11,16 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2 import model_zoo
 
-# --- 1. MEMORY OPTIMIZATIONS ---
+# --- 1. SYSTEM OPTIMIZATIONS ---
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-torch.set_grad_enabled(False) # Saves RAM by disabling gradient calculations
+torch.set_grad_enabled(False) # Disables memory-heavy math not needed for scanning
 
 app = FastAPI()
 
 # --- 2. THE ULTIMATE CORS FIX ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"], # Allows your local frontend to connect
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,7 +61,7 @@ async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), mode
         outputs = predictor(img)
         damage_count = len(outputs["instances"])
 
-        # Vision Cost Estimate
+        # Vision Cost Estimate via Groq
         img_b64 = base64.b64encode(contents).decode('utf-8')
         prompt = f"Estimate repair for {brand} {model} with {damage_count} damage spots. Return a simple HTML table with INR costs."
         

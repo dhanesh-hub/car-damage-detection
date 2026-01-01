@@ -5,6 +5,7 @@ import gc
 import cv2
 import numpy as np
 import torch
+import requests
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
@@ -13,16 +14,12 @@ from detectron2.config import get_cfg
 from detectron2 import model_zoo
 
 # --- 1. EMERGENCY FIXES FOR DEPLOYMENT ---
-# Forces PyTorch 2.6 to load "untrusted" Detectron2 weights
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-
-# Disable Gradient Calculation (saves ~30% RAM)
 torch.set_grad_enabled(False)
 
 app = FastAPI()
 
 # --- 2. CORS SETUP ---
-# Added both localhost and your new Railway URL to allow communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -34,7 +31,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 3. AI MODEL INITIALIZATION ---
+# --- 3. MODEL WEIGHTS FALLBACK SYSTEM ---
+base_path = os.path.dirname(__file__)
+model_weights_path = os.path.join(base_path, "damage_segmentation_model.pth")
+
+# URL to a known direct download (Using a standard Detectron2 COCO model as fallback)
+# If you have your own Dropbox/Drive direct link, replace this URL:
+FALLBACK_URL = "https://dl.fbaipublicfiles.com/detectron2/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f10217.pkl"
+
+def verify_weights():
+    """Checks if weights exist and are not just a Git LFS pointer."""
+    if os.path.exists(model_weights_path):
+        file_size = os.path.getsize(model_weights_path)
+        if file_size > 1000000: # If larger than 1MB, it's likely real data
+            print(f"✅ Valid weights found locally ({file_size / 1e6:.2f} MB)")
+            return
+    
+    print("⚠️ Local weights missing or corrupted pointer detected. Downloading fallback...")
+    response = requests.get(FALLBACK_URL, stream=True)
+    with open(model_weights_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    print("✅ Download complete.")
+
+verify_weights()
+
+# --- 4. AI MODEL INITIALIZATION ---
 cfg = get_cfg()
 cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2 
@@ -43,17 +65,13 @@ cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.10 
 cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.0     
 
-# FIXED: Look for the file locally in the same folder as this script
-base_path = os.path.dirname(__file__)
-model_weights_path = os.path.join(base_path, "damage_segmentation_model.pth")
 cfg.MODEL.WEIGHTS = model_weights_path
-
-cfg.MODEL.DEVICE = "cpu"  # Required for Railway Free Tier
+cfg.MODEL.DEVICE = "cpu" 
 
 # Initialize Predictor
 predictor = DefaultPredictor(cfg)
 
-# Groq Client (API Key should be in Railway Variables)
+# Groq Client
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 @app.get("/health")
@@ -83,7 +101,6 @@ async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), mode
         ]}]
     )
 
-    # Clean up memory after processing
     gc.collect()
 
     return {
@@ -93,6 +110,5 @@ async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), mode
 
 if __name__ == "__main__":
     import uvicorn
-    # Railway provides the PORT environment variable automatically
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)

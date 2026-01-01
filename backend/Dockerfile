@@ -3,23 +3,26 @@ FROM python:3.9-slim-bullseye
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Install system tools + compiler (Detectron2 needs these to unpack)
+# 1. Install system tools + compiler
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     gcc \
     g++ \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 2. Upgrade pip and install the "heavy" AI dependencies first
+# 2. Install specific versions of Torch that match the Detectron2 link
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir \
+    torch==2.1.0 \
+    torchvision==0.16.0 \
+    --index-url https://download.pytorch.org/whl/cpu
 
-# 3. INSTALL DETECTRON2 (The missing piece)
-# This points to the official pre-built versions for CPU servers
+# 3. Install Detectron2 using the EXACT matching wheel for Torch 2.1
 RUN pip install --no-cache-dir detectron2 -f \
     https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.1/index.html
 

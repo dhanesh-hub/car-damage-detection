@@ -4,7 +4,7 @@ python-multipart
 pillow
 numpy
 torch
-
+opencv-python-headless
 # detectron2 is optional and platform-specific. To install detectron2, follow the official instructions:
 # https://detectron2.readthedocs.io/en/latest/tutorials/install.html
 # Example (CPU-only wheel may not be provided):

@@ -1,26 +1,8 @@
-# VERSION 2.0 - NO FB LINKS
-FROM python:3.9-slim-bullseye
-
-USER root
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install system tools
-RUN apt-get update -y && \
-    apt-get install -y --no-install-recommends \
-    libgl1 libglib2.0-0 gcc g++ python3-dev git && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Install Torch
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# INSTALL DIRECTLY FROM GIT - This replaces the broken link
-RUN pip install --no-cache-dir 'git+https://github.com/facebookresearch/detectron2.git'
-
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . /app
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+fastapi
+uvicorn
+python-multipart
+opencv-python-headless
+groq
+torch --index-url https://download.pytorch.org/whl/cpu
+torchvision --index-url https://download.pytorch.org/whl/cpu
+https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.1/index.html

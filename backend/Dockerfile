@@ -2,7 +2,7 @@
 # For production with Detectron2, build on a CUDA-enabled base image and follow Detectron2's install guide.
 FROM python:3.11-slim
 WORKDIR /app
-COPY backend/requirements.txt ./
+COPY requirements.txt ./
 RUN apt-get update && apt-get install -y build-essential git curl && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app

@@ -1,14 +1,33 @@
-fastapi
-uvicorn[standard]
-python-multipart
-pillow
-numpy
-torch
-opencv-python-headless
-groq
-# detectron2 is optional and platform-specific. To install detectron2, follow the official instructions:
-# https://detectron2.readthedocs.io/en/latest/tutorials/install.html
-# Example (CPU-only wheel may not be provided):
-# pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu118/torch2.2/index.html
+FROM python:3.9-slim-bullseye
 
-# If you don't need detectron2, the backend will still run and return a stubbed response.
+USER root
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Install EVERYTHING needed to build AI software from scratch
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    gcc \
+    g++ \
+    python3-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 2. Install Torch (CPU version)
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# 3. Install Detectron2 directly from GitHub (The most reliable way)
+# This avoids broken links and builds it specifically for your server
+RUN pip install --no-cache-dir 'git+https://github.com/facebookresearch/detectron2.git'
+
+# 4. Standard requirements
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 5. Finish setup
+COPY . /app
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

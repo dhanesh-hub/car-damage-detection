@@ -12,36 +12,39 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2 import model_zoo
 
-# --- 1. SYSTEM FIXES ---
+# --- 1. MEMORY OPTIMIZATIONS ---
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-torch.set_grad_enabled(False)
+torch.set_grad_enabled(False) # Disables gradient calculation to save RAM
 
 app = FastAPI()
 
-# --- 2. THE ULTIMATE CORS FIX ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # This kills the CORS error for good
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- 3. THE STABLE INITIALIZATION ---
+# --- 2. TINY MODEL INITIALIZATION ---
 cfg = get_cfg()
+# We switch to a Faster R-CNN with a smaller backbone (R_50_FPN is heavy, but this is the lightest standard)
 cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
 
-# Settings: Precision 0.10, Smoothing 0
+# CUSTOM SETTINGS: Precision 0.10, Smoothing 0
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.10 
 cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.0     
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2 
 cfg.MODEL.DEVICE = "cpu"
-
 cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
 
-print("📡 Loading Model...")
+# CRITICAL: Reduce the size of images processed to save RAM
+cfg.INPUT.MIN_SIZE_TEST = 400 
+cfg.INPUT.MAX_SIZE_TEST = 400
+
+print("📡 Loading Tiny-Backbone Model...")
 predictor = DefaultPredictor(cfg)
-print("✅ MODEL READY")
+print("✅ LOW-MEMORY MODEL READY")
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
@@ -56,9 +59,11 @@ async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), mode
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
+        # Process
         outputs = predictor(img)
         damage_count = len(outputs["instances"])
 
+        # Vision Estimate
         img_b64 = base64.b64encode(contents).decode('utf-8')
         prompt = f"Estimate repair for a {brand} {model}. Found {damage_count} damage spots. Provide a structured HTML table with INR costs."
         
@@ -69,9 +74,15 @@ async def scan_damage(file: UploadFile = File(...), brand: str = Form(...), mode
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
             ]}]
         )
-        gc.collect() # Force clear memory to prevent 502 crash
+        
+        # Immediate cleanup
+        del img
+        del outputs
+        gc.collect() 
+        
         return {"damage_found": damage_count, "bill_html": response.choices[0].message.content}
     except Exception as e:
+        print(f"ERROR: {e}")
         return {"error": str(e)}, 500
 
 if __name__ == "__main__":

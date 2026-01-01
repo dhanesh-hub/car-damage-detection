@@ -11,9 +11,9 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2 import model_zoo
 
-# --- 1. SYSTEM OPTIMIZATIONS ---
+# --- 1. MEMORY OPTIMIZATIONS ---
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-torch.set_grad_enabled(False) # Disables memory-heavy math not needed for scanning
+torch.set_grad_enabled(False) # Saves RAM by disabling gradient calculations
 
 app = FastAPI()
 

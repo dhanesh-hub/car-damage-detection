@@ -3,6 +3,4 @@ uvicorn
 python-multipart
 opencv-python-headless
 groq
-torch --index-url https://download.pytorch.org/whl/cpu
-torchvision --index-url https://download.pytorch.org/whl/cpu
-https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.1/index.html
+# Do NOT put detectron2 or torch here!

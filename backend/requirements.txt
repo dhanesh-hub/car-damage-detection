@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-python-multipart
-opencv-python-headless
-groq
-requests
-# Do NOT put detectron2 or torch here!
